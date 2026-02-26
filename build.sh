@@ -1,0 +1,3 @@
+JAVA_HOME=/opt/android-studio/jbr ./gradlew assembleAndroidTest && \
+PATH=$PATH:/media/some/opt/android-sdk/platform-tools adb install -r ./build/outputs/apk/androidTest/debug/FuxRiver-debug-androidTest.apk && \
+/media/some/opt/android-sdk/platform-tools/adb shell am instrument -w -m -e class cn.demo.xriver.AlipaySignInTest#testAlipaySignIn cn.demo.xriver.test/androidx.test.runner.AndroidJUnitRunner

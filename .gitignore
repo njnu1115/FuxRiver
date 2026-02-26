@@ -1,0 +1,43 @@
+# 编译输出
+/build/
+/app/build/
+/*.apk
+*.ap_
+*.dex
+*.class
+
+# Android Studio/IntelliJ
+/.idea/
+/*.iml
+*.ipr
+*.iws
+.gradle/
+local.properties
+
+# VS Code
+.vscode/
+.history/
+
+# 日志和临时文件
+*.log
+*.tmp
+*.swp
+*.swo
+
+# Mac/Linux系统文件
+.DS_Store
+Thumbs.db
+
+# 测试输出
+/test-output/
+*.xml
+
+# 其他常见忽略
+*.keystore
+*.jks
+*.bak
+*.orig
+*.rej
+
+# 用户自定义
+/sdcard/screenshot_*.png
