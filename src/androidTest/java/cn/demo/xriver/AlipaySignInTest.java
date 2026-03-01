@@ -40,12 +40,13 @@ public class AlipaySignInTest {
     private static final String[] clickTexts = {
             "一键核算用电成本",
             "合理规划用电开销",
+            "天天签到赢奖励",
             "打卡签到领奖励",
             "打卡记录每天好心情",
             "智能算电省钱有道",
+            "浏览机汤租机3秒",
             "浏览爱租相机3秒",
             "浏览租机猩3秒",
-            "浏览机汤租机3秒",
             "浏览网商贷15秒",
             "用电省钱精准算费",
             "电费明细精准呈现",
@@ -59,7 +60,7 @@ public class AlipaySignInTest {
             "逛一逛余额宝摇钱树",
             "逛一逛小米钱包APP",
             "逛一逛摇红包",
-            "逛一逛支付宝运动路",
+            "逛一逛支付宝运动路线",
             "逛一逛每日惊喜不断",
             "逛一逛福气鱼塘",
             "逛一逛签到领红包",
@@ -84,16 +85,17 @@ public class AlipaySignInTest {
             "滑动浏览15秒红包会场"
     };
     private static final String[] awayBackTexts = {
-            "逛一逛淘宝消消乐",
-            "逛一逛淘宝视频",
-            "逛一逛淘宝斗地主",
-            "逛一逛淘金币频道",
-            "逛一逛淘宝芭芭农场",
             "逛一逛天猫APP",
+            "逛一逛淘宝斗地主",
+            "逛一逛淘宝消消乐",
+            "逛一逛淘宝芭芭农场",
+            "逛一逛淘宝视频",
+            "逛一逛淘金币频道",
             "逛中国移动领流量",
+            "逛淘宝签到领现金",
             "逛百度天天领现金",
             "逛百度极速版领钱",
-            "逛美团刷视频领现金",
+            "逛美团刷视频领现金"
     };
 
     private UiDevice device;
@@ -180,16 +182,16 @@ public class AlipaySignInTest {
         Thread.sleep(WAIT_TIMEOUT);
         device.click(561, GO_FINISH_Y);
         Thread.sleep(WAIT_TIMEOUT);
-        // pause the play by a single tap at the center of the screen
-        int centerX = device.getDisplayWidth() / 2;
-        int centerY = device.getDisplayHeight() / 2;
-        device.click(centerX, centerY);
-        // then double tap every 25 seconds to prevent screen lock
-        for (int j = 0; j < 14; j++) {
-            Thread.sleep(25000);
-            device.click(centerX, centerY);
-            Thread.sleep(500);
-            device.click(centerX, centerY);
+
+        for (int j = 0; j < 20; j++) {
+            Thread.sleep(20000);
+            UiObject2 riskobj = device.findObject(By.text("网络不太顺畅"));
+            if (riskobj != null) {
+                device.pressBack();
+                continue;
+            }else{
+                device.click(852,DEVICE_NAME.equals("umi") ? 280 : DEVICE_NAME.equals("ruben") ? 360 : 360);
+            }
         }
         Thread.sleep(WAIT_TIMEOUT);
         device.pressBack();
