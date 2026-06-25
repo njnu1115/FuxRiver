@@ -36,9 +36,10 @@ public class AlipaySignInTest {
     private static final int LOOP_COUNT = 64;
     private static final long WAIT_TIMEOUT = 1000; // ms
     private static final String DEVICE_NAME = android.os.Build.DEVICE;
-    private static final int GO_FINISH_Y = DEVICE_NAME.equals("umi") ? 1600 : DEVICE_NAME.equals("ruben") ? 1900 : 1900;
+    private static final int GO_FINISH_Y = DEVICE_NAME.equals("umi") ? 1600 : DEVICE_NAME.equals("rubens") ? 1900 : 1900;
     private static final String[] clickTexts = {
             "一键核算用电成本",
+            "从支付宝首页访问会员",
             "合理规划用电开销",
             "天天签到赢奖励",
             "打卡签到领奖励",
@@ -57,8 +58,9 @@ public class AlipaySignInTest {
             "逛15秒芝麻租赁频道",
             "逛15秒芝麻租赁首页",
             "逛一逛乐游记",
+            "逛一逛余额宝",
             "逛一逛余额宝摇钱树",
-            "逛一逛小米钱包APP",
+            "逛一逛余额宝攒钱节",
             "逛一逛摇红包",
             "逛一逛支付宝运动路线",
             "逛一逛每日惊喜不断",
@@ -73,8 +75,12 @@ public class AlipaySignInTest {
             "逛一逛领奖励",
             "逛一逛高德打车小程序",
             "逛双11会场",
+            "逛大额账单",
+            "逛我的快递包裹游历",
+            "逛支付有礼每日攒红包",
             "逛热卖好货15秒",
             "逛蚂蚁庄园喂小鸡",
+            "逛退款账单",
             "逛飞猪一日游景点门票",
             "集鸿运金抢兑红包"
     };
@@ -85,17 +91,15 @@ public class AlipaySignInTest {
             "滑动浏览15秒红包会场"
     };
     private static final String[] awayBackTexts = {
-            "逛一逛天猫APP",
+            "逛一逛游戏中心",
             "逛一逛淘宝斗地主",
             "逛一逛淘宝消消乐",
             "逛一逛淘宝芭芭农场",
             "逛一逛淘宝视频",
             "逛一逛淘金币频道",
-            "逛中国移动领流量",
-            "逛淘宝签到领现金",
-            "逛百度天天领现金",
-            "逛百度极速版领钱",
-            "逛美团刷视频领现金"
+            "逛一逛小米钱包APP",
+            "逛一逛大众点评",
+            "逛淘宝签到领现金"
     };
 
     private UiDevice device;
