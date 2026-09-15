@@ -2,13 +2,12 @@ package cn.demo.xriver;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.uiautomator.By;
-import androidx.test.uiautomator.StaleObjectException;
 import androidx.test.uiautomator.UiDevice;
 import androidx.test.uiautomator.UiObject2;
-import android.util.Log;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.util.Log;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -17,407 +16,301 @@ import java.util.List;
 
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
 
+/**
+ * @startuml
+ * [*] --> DETERMIN : Launch
+ * HOME --> DETERMIN : startOver() via DEEPLINK
+ * START --> HOLDOVER : pickAndClick()\nset scrollFlag\nset timeout
+ * HOLDOVER --> HOLDOVER : [3s] scrollFlag=true\nscroll()
+ * HOLDOVER --> DETERMIN : timeout reached\n(pressBack)
+ * DETERMIN --> HOLDOVER : HOLDOVER strings found
+ * DETERMIN --> START : START strings found
+ * DETERMIN --> HOME : HOME strings found
+ * DETERMIN --> PRESSBACK : nothing found
+ * PRESSBACK --> DETERMIN : hold 10s, pressBack(), counter++
+ * PRESSBACK --> [*] : counter reach 1000
+ * @enduml
+ */
 @RunWith(AndroidJUnit4.class)
 public class AlipaySignInTest {
 
-	private static final String ALIPAY_PACKAGE = "com.eg.android.AlipayGphone";
-//	private static final String ALIPAY_SIGN_IN_ACTIVITY = "com.eg.android.AlipayGphone/com.alipay.mobile.nebulax.xriver.activity.XRiverActivity";
-	private static final String DEEP_LINK_URL = "alipays://platformapi/startapp?appId=68687805&url=https%3A%2F%2Frender.alipay.com%2Fp%2Fyuyan%2F180020380000000023%2Fpoint-sign-in.html";
-	private static final int LOOP_COUNT = 64;
-	private static final long WAIT_TIMEOUT = 1000; // ms
-	private static final String DEVICE_NAME = android.os.Build.DEVICE;
-	private static final int GO_FINISH_Y = DEVICE_NAME.equals("umi") ? 1600 : 2085;
-	private static final String[] clickTexts = {
-			"一键核算用电成本",
-			"从支付宝首页访问会员",
-			"合理规划用电开销",
-			"天天签到赢奖励",
-			"打卡签到领奖励",
-			"打卡记录每天好心情",
-			"智能算电省钱有道",
-			"浏览机汤租机3秒",
-			"浏览爱租相机3秒",
-			"浏览租机猩3秒",
-			"浏览网商贷15秒",
-			"用电省钱精准算费",
-			"电费明细精准呈现",
-			"看5秒视频领积分",
-			"逛15秒安全知识",
-			"逛15秒支付有礼领红包",
-			"逛15秒芝麻租赁频道",
-			"逛15秒芝麻租赁首页",
-			"逛一逛乐游记",
-			"逛一逛里程币兑红包",
-			"来余额宝攒钱节领红包",
-			"逛一逛滴滴出行活动",
-			"逛一逛余额宝",
-			"逛一逛余额宝摇钱树",
-			"逛一逛余额宝攒钱节",
-			"逛一逛摇红包",
-			"逛一逛支付宝运动路线",
-			"逛一逛支付有礼",
-			"逛一逛每日惊喜不断",
-			"逛一逛福气鱼塘",
-			"逛一逛签到领红包",
-			"逛一逛芝麻信用",
-			"逛一逛芭芭农场",
-			"逛一逛蚂蚁新村",
-			"逛一逛蚂蚁森林",
-			"逛一逛话费活动",
-			"逛一逛领取优惠",
-			"逛一逛领奖励",
-			"逛一逛高德打车小程序",
-			"逛双11会场",
-			"逛大额账单",
-			"逛我的快递包裹游历",
-			"逛支付有礼每日攒红包",
-			"逛热卖好货15秒",
-			"每日浇水领真绿植",
-			"逛蚂蚁庄园喂小鸡",
-			"逛退款账单",
-			"逛飞猪一日游景点门票",
-			"集鸿运金抢兑红包"
-	};
-	private static final String[] scrollTexts = {
-			"滑动浏览优品会场15秒",
-			"逛热卖好货15秒",
-			"逛15秒精选超值好物",
-			"逛一逛国补好货会场",
-			"滑动浏览15秒红包会场"
-	};
-	private static final String[] awayBackTexts = {
-			"逛一逛游戏中心",
-			"逛一逛淘宝斗地主",
-			"逛一逛淘宝消消乐",
-			"逛一逛淘宝芭芭农场",
-			"逛一逛淘宝视频",
-			"逛一逛淘金币频道",
-			"逛一逛小米钱包APP",
-			"逛一逛大众点评",
-			"逛淘宝签到领现金"
-	};
+    private static final String TAG = "FuxRiver19890604";
+    private static final String ALIPAY_PACKAGE = "com.eg.android.AlipayGphone";
+    private static final String DEEP_LINK_URL = "alipays://platformapi/startapp?appId=68687805&url=https%3A%2F%2Frender.alipay.com%2Fp%2Fyuyan%2F180020380000000023%2Fpoint-sign-in.html";
+    private static final long WAIT_TIMEOUT = 1000;
+    private static final String DEVICE_NAME = android.os.Build.DEVICE;
+    private static final int GO_FINISH_Y = DEVICE_NAME.equals("umi") ? 1600 : 2085;
 
-	private UiDevice device;
-	private Context context;
+    /* ================= 状态机参数 ================= */
+    private static final long TICK_MS           = 3000;    // HOLDOVER 心跳
+    private static final long PRESSBACK_HOLD_MS = 10000;   // PRESSBACK 停留 10s
+    private static final long RESCUE_HOLD_MS    = 15000;   // DETERMIN 直入 HOLDOVER（无任务上下文）的兜底时长
+    private static final long SETTLE_MS         = 1500;    // DETERMIN 观察前的稳定等待
+    private static final int  MAX_PRESSBACK     = 1000;    // counter 上限 → 结束
+    private static final int  MAX_TASKS         = 64;      // 任务数上限
+    private static final int  MAX_EMPTY_START   = 5;       // 连续捡不到任务的空轮上限
 
-	@Before
-	public void setUp() throws Exception {
-		device = UiDevice.getInstance(getInstrumentation());
-		context = getInstrumentation().getContext();
-		device.setOrientationNatural();
+    /* ================= 状态判定字符串 ================= */
+    private static final String[] START_MARKERS = {
+            "赚更多积分", "我已连签", "连签奖励", "兑好物",
+            "恭喜完成今日", "福利任务", "继续做任务赚积分吧"};
+    private static final String[] HOME_MARKERS = {
+            "扫一扫", "收付款", "卡包", "出行", "我的"};
+    private static final String[] HOLDOVER_MARKERS = {      // DETERMIN 认定"还在任务页"
+            "已获得奖励", "账号风险检测", "账号风险监测", "通用任务悬浮球"};
+    private static final String[] DONE_MARKERS  = {"已获得奖励"};                    // 提前完成
+    private static final String[] POPUP_MARKERS = {"账号风险检测", "账号风险监测", "登录"}; // 弹窗 → back 压掉
 
-		device.waitForWindowUpdate(ALIPAY_PACKAGE, WAIT_TIMEOUT);
-	}
+    /* ================= 任务文案 ================= */
+    private static final String[] clickTexts = {
+            "一键核算用电成本", "从支付宝首页访问会员", "合理规划用电开销",
+            "天天签到赢奖励", "打卡签到领奖励", "打卡记录每天好心情",
+            "智能算电省钱有道", "浏览机汤租机3秒", "浏览爱租相机3秒",
+            "浏览租机猩3秒", "浏览网商贷15秒", "用电省钱精准算费",
+            "电费明细精准呈现", "看5秒视频领积分", "逛15秒安全知识",
+            "逛15秒支付有礼领红包", "逛15秒芝麻租赁频道", "逛15秒芝麻租赁首页",
+            "逛一逛乐游记", "逛一逛里程币兑红包", "来余额宝攒钱节领红包",
+            "逛一逛滴滴出行活动", "逛一逛余额宝", "逛一逛余额宝摇钱树",
+            "逛一逛余额宝攒钱节", "逛一逛摇红包", "逛一逛支付宝运动路线",
+            "逛一逛支付有礼", "逛一逛每日惊喜不断", "逛一逛福气鱼塘",
+            "逛一逛签到领红包", "逛一逛芝麻信用", "逛一逛芭芭农场",
+            "逛一逛蚂蚁新村", "逛一逛蚂蚁森林", "逛一逛话费活动",
+            "逛一逛领取优惠", "逛一逛领奖励", "逛一逛高德打车小程序",
+            "逛双11会场", "逛大额账单", "逛我的快递包裹游历",
+            "逛支付有礼每日攒红包", "逛热卖好货15秒", "每日浇水领真绿植",
+            "逛蚂蚁庄园喂小鸡", "逛退款账单", "逛飞猪一日游景点门票",
+            "集鸿运金抢兑红包"
+    };
+    private static final String[] scrollTexts = {
+            "滑动浏览优品会场15秒", "逛热卖好货15秒", "逛15秒精选超值好物",
+            "逛一逛国补好货会场", "滑动浏览15秒红包会场"
+    };
+    private static final String[] awayBackTexts = {
+            "逛一逛游戏中心", "逛一逛淘宝斗地主", "逛一逛淘宝消消乐",
+            "逛一逛淘宝芭芭农场", "逛一逛淘宝视频", "逛一逛淘金币频道",
+            "逛一逛小米钱包APP", "逛一逛大众点评", "逛淘宝签到领现金"
+    };
 
-	private boolean seekAndClick(String text) throws Exception {
-		Thread.sleep(WAIT_TIMEOUT);
-		UiObject2 obj = device.findObject(By.text(text));
-		if (obj != null) {
-			logger("Found and clicked: " + text);
-			obj.click();
-			Thread.sleep(WAIT_TIMEOUT);
-			return true;
-		} else {
-			logger("Not found or not clickable: " + text);
-			Thread.sleep(WAIT_TIMEOUT);
-			return false;
-		}
-	}
+    /* ================= 任务表：全部 CONTAINS，差异只剩 holdMs 和 scrollFlag ================= */
+    private static class Group {
+        final String[] texts;
+        final long holdMs;
+        final boolean scroll;
+        Group(String[] texts, long holdMs, boolean scroll) {
+            this.texts = texts; this.holdMs = holdMs; this.scroll = scroll;
+        }
+        boolean matches(String text) {
+            for (String t : texts) if (text.contains(t)) return true;
+            return false;
+        }
+    }
 
-	private void justChange() throws Exception {
-		int screenHeight = device.getDisplayHeight();
-		int screenWidth = device.getDisplayWidth();
-		int centerX = screenWidth / 2;
-		boolean isClicked = false;
-		for (int j = 0; j < 4; j++) {
-			UiObject2 obj = device.findObject(By.text("换一换"));
-			if (obj != null) {
-				obj.click();
-				isClicked = true;
-				// swipe to top and click "赚更多积分"
-				device.swipe(540, 300, 540, 1500, 50);
-				Thread.sleep(WAIT_TIMEOUT);
-				seekAndClick("赚更多积分");
-				break;
-			} else {
-				device.swipe(centerX, screenHeight * 3 / 4, centerX, screenHeight * 2 / 4, 200);
-			}
-		}
-		if (!isClicked) {
-			startOver();
-		}
-	}
+    /** 顺序即优先级：scrollTexts 的 "逛热卖好货15秒" 同时也在 clickTexts 里，放前面保证按滑动处理 */
+    private static final Group[] GROUPS = {
+            new Group(scrollTexts,            21_000,    true),   // 滑动类：边等边滑（≈原 ScrollTask 9 次滑动）
+            new Group(clickTexts,             18_000,    false),  // 普通点击类
+            new Group(new String[]{"5分钟"},  12*60_000, false),  // 短剧类
+            new Group(new String[]{"玩一玩"}, 200_000,   false),  // 小游戏
+            new Group(awayBackTexts,          8_888,     false),  // 跳出去再回来类
+    };
 
-	private void ScrollTask(UiObject2 obj) throws Exception {
-		obj.click();
-		Thread.sleep(WAIT_TIMEOUT);
-		device.click(561, GO_FINISH_Y);
-		for (int j = 0; j < 9; j++) {
-			Thread.sleep(WAIT_TIMEOUT);
-			UiObject2 riskobj = device.findObject(By.text("账号风险检测"));
-			if (riskobj != null) {
-				device.pressBack();
-				continue;
-			}
-			Thread.sleep(WAIT_TIMEOUT);
-			device.swipe(561, 1000, 498, 800, 64);
-			Thread.sleep(WAIT_TIMEOUT);
-		}
-		device.pressBack();
-	}
+    /* ================= 状态机 ================= */
+    private enum State { DETERMIN, HOME, START, HOLDOVER, PRESSBACK }
 
-	private void ClickTask(UiObject2 obj) throws Exception {
-		obj.click();
-		Thread.sleep(WAIT_TIMEOUT);
-		device.click(561, GO_FINISH_Y);
-		Thread.sleep(18000);
-		device.pressBack();
-	}
+    private UiDevice device;
+    private Context context;
 
-	private void ShortTVTask(UiObject2 obj) throws Exception {
-		obj.click();
-		Thread.sleep(WAIT_TIMEOUT);
-		device.click(561, GO_FINISH_Y);
+    private State state = State.DETERMIN;   // [*] --> DETERMIN : Launch
+    private List<UiObject2> lastDump;       // DETERMIN 的 dump，传给 START 复用
+    private Group task;                     // 当前任务（HOLDOVER 的参数来源）
+    private long deadline;                  // HOLDOVER 截止时间
+    private int pressBackCount;             // 图中的 counter
+    private int taskCount;
+    private int emptyStart;
 
-		// ========== 智能轮询：替代原来的 Thread.sleep(330000) ==========
-		long startTime = System.currentTimeMillis();
-		long timeoutMs = 12 * 60 * 1000;   // 兜底超时
-		long intervalMs = 20 * 1000;       // 检查间隔
-		boolean taskCompleted = false;
+    @Before
+    public void setUp() throws Exception {
+        device = UiDevice.getInstance(getInstrumentation());
+        context = getInstrumentation().getContext();
+        device.setOrientationNatural();
+        device.waitForWindowUpdate(ALIPAY_PACKAGE, WAIT_TIMEOUT);
+    }
 
-		logger("ShortTV: 开始智能轮询，最长等待 24分钟...");
+    @Test
+    public void testAlipaySignIn() throws Exception {
+        long t0 = System.currentTimeMillis();
+        while (pressBackCount < MAX_PRESSBACK && taskCount < MAX_TASKS && emptyStart < MAX_EMPTY_START) {
+            logger("== state=" + state + " tasks=" + taskCount + " backs=" + pressBackCount);
+            switch (state) {
+                case DETERMIN:  determine();       break;
+                case HOME:      startOver();       break;   // --> DETERMIN
+                case START:     doStart(lastDump); break;
+                case HOLDOVER:  doHoldover();      break;
+                case PRESSBACK: doPressBack();     break;
+            }
+        }
+        logger("Finished: tasks=" + taskCount + ", counter=" + pressBackCount
+                + ", " + (System.currentTimeMillis() - t0) / 1000 + "s");
+    }
 
-		while (System.currentTimeMillis() - startTime < timeoutMs) {
-			Thread.sleep(intervalMs);
+    /** DETERMIN：整页 dump 一次，分类；dump 通过 lastDump 传给 START */
+    private void determine() throws Exception {
+        Thread.sleep(SETTLE_MS);
+        lastDump = device.findObjects(By.clazz("android.widget.TextView"));   // 全流程唯一一次整页 dump
+        String screen = String.join("", extractAndLogTexts(lastDump));
 
-			// 1. 获取当前屏幕所有中文文本（复用你已有的方法）
-			List<UiObject2> textViews = device.findObjects(By.clazz("android.widget.TextView"));
-			List<String> chineseTexts = extractAndLogTexts(textViews);
-			String screenText = String.join("", chineseTexts);
+        if (hitCount(screen, START_MARKERS) > 3)   { state = State.START;    return; }
+        if (containsAny(screen, HOLDOVER_MARKERS)) { state = State.HOLDOVER; return; }
+        if (hitCount(screen, HOME_MARKERS) >= 2)   { state = State.HOME;     return; }
+        // 兜底：不在支付宝前台（冷启动/进程被杀）→ 直接 deeplink，避免空转 back
+        if (!ALIPAY_PACKAGE.equals(device.getCurrentPackageName())) {
+            logger("not in alipay (" + device.getCurrentPackageName() + ") -> HOME");
+            state = State.HOME;
+            return;
+        }
+        state = State.PRESSBACK;   // nothing found
+    }
 
-			long elapsedSec = (System.currentTimeMillis() - startTime) / 1000;
-			logger("ShortTV: 已等待 " + elapsedSec + " 秒");
+    /** START：直接用 DETERMIN 传进来的 dump 挑任务，不再重复 dump */
+    private void doStart(List<UiObject2> dump) throws Exception {
+        String pick = null;
+        Group g = null;
+        if (dump != null) {
+            for (UiObject2 obj : dump) {
+                String text = safeText(obj);
+                if (text == null || text.isEmpty()) continue;
+                g = matchGroup(text);
+                if (g != null) { pick = text; break; }
+            }
+        }
+        if (pick == null) {                    // 无任务可捡 → 退出去刷新
+            emptyStart++;
+            logger("START: no task (" + emptyStart + "/" + MAX_EMPTY_START + ") -> PRESSBACK");
+            state = State.PRESSBACK;
+            return;
+        }
+        logger("pick: 「" + pick + "」 hold=" + g.holdMs + "ms scroll=" + g.scroll);
 
-			if (screenText.contains("已获得奖励")) {
-				device.pressBack();
-				logger("ShortTV: 已获得奖励，点击返回<一层...");
-			} else if (screenText.contains("账号风险监测") || screenText.contains("登录") ) {
-				device.pressBack();
-			} else if (screenText.contains("通用任务悬浮球") ||  screenText.contains("看短剧5分钟得15积分") || screenText.contains("看一看5分钟得奖励")) {
-				logger("ShortTV: 积分计时进行中继续等待...");
-			} else if (isBackToStartPage()){
-				logger("Already returned to point page, end of ShortTVTask....");
-				return;
-			} else {
-				// 情况 D：其他未知状态 → 记录日志，继续等
-				device.pressBack();
-				logger("ShortTV: 未匹配到已知状态，点击返回<一层");
-			}
-		}
-		// 3. 超时兜底
-		if (!taskCompleted) {
-			logger("ShortTV: 达到超时，强制结束。");
-		}
+        seekAndClick("赚更多积分");             // 原有习惯动作：回任务区
 
-		// 4. 最终返回
-		device.pressBack();
-		logger("ShortTV: 任务结束，已按返回。");
-	}
+        // 锚点点击后列表可能滚过，只按文本补一次单点查询，避免拿旧坐标误点
+        UiObject2 obj = device.findObject(By.text(pick));
+        if (obj == null) { logger("pick vanished -> PRESSBACK"); state = State.PRESSBACK; return; }
 
-	@Test
-	public void testAlipaySignIn() throws Exception {
+        obj.click();                           // ── pickAndClick ──
+        Thread.sleep(WAIT_TIMEOUT);
+        device.click(561, GO_FINISH_Y);        // "去完成"
 
-		for (int i = 0; i < LOOP_COUNT; i++) {
-			logger("Loop iteration: " + (i + 1));
-			boolean isClicked = false;
-			seekAndClick("赚更多积分");
-			List<UiObject2> objs = device.findObjects(By.clazz("android.widget.TextView"));
-			List<String> allTexts = extractAndLogTexts(objs);
+        task = g;
+        deadline = System.currentTimeMillis() + g.holdMs;   // set timeout
+        taskCount++;
+        emptyStart = 0;
+        state = State.HOLDOVER;
+    }
 
-			if (!objs.isEmpty()) {
-				for (UiObject2 obj : objs) {
-					try {
-						String text = obj.getText();
-						if (text == null || text.isEmpty())
-							continue;
+    /** HOLDOVER：等到超时；scrollFlag=true 每 3s 滑一次；弹窗压掉；完成标记提前走 */
+    private void doHoldover() throws Exception {
+        if (task == null) deadline = System.currentTimeMillis() + RESCUE_HOLD_MS;  // DETERMIN 直入
+        if (System.currentTimeMillis() >= deadline) {                              // timeout reached
+            logger("HOLDOVER: timeout -> pressBack -> DETERMIN");
+            device.pressBack();
+            task = null;
+            state = State.DETERMIN;
+            return;
+        }
 
-						for (String scrollText : scrollTexts) {
-							if (text.contains(scrollText)) {
-								ScrollTask(obj);
-								isClicked = true;
-								break;
-							}
-						}
-						if (isClicked)
-							break;
+        Thread.sleep(TICK_MS);
+        String screen = screenText();
 
-						for (String clickText : clickTexts) {
-							if (text.equals(clickText) || text.endsWith("3秒") || text.equals("+3积分")) {
-								logger("Found and clicked: " + clickText);
-								ClickTask(obj);
-								isClicked = true;
-								break;
-							}
-						}
-						if (isClicked)
-							break;
+        if (containsAny(screen, DONE_MARKERS)) {           // 提前完成，省时间
+            logger("HOLDOVER: 已获得奖励 -> pressBack -> DETERMIN");
+            device.pressBack();
+            task = null;
+            state = State.DETERMIN;
+            return;
+        }
+        if (containsAny(screen, POPUP_MARKERS)) {          // 风控/登录弹窗 → back 压掉
+            device.pressBack();
+            return;
+        }
+        if (task != null && task.scroll) {                 // scrollFlag=true → scroll()
+            device.swipe(561, 1000, 498, 800, 64);
+        }
+    }
 
-						if (text.startsWith("玩一玩")) {
-							logger("Found and clicked: " + text);
-							obj.click();
-							isClicked = true;
-							Thread.sleep(WAIT_TIMEOUT);
-							device.click(561, GO_FINISH_Y);
-							Thread.sleep(200000);
-							Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(DEEP_LINK_URL));
-							intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-							context.startActivity(intent);
-							break;
-						}
-						if (isClicked)
-							break;
+    /** PRESSBACK：hold 10s → pressBack → counter++ → DETERMIN */
+    private void doPressBack() throws Exception {
+        Thread.sleep(PRESSBACK_HOLD_MS);
+        device.pressBack();
+        pressBackCount++;
+        logger("PRESSBACK: counter=" + pressBackCount);
+        state = State.DETERMIN;
+    }
 
-						if (text.endsWith("5分钟")) {
-							logger("Found and clicked: " + text);
-							ShortTVTask(obj);
-							isClicked = true;
-							break;
-						}
-						if (isClicked)
-							break;
+    /** HOME：deeplink 回起点 → DETERMIN（进入 HOME 本身就说明不在起点，无需再判断） */
+    private void startOver() throws Exception {
+        logger("HOME: startOver via DEEPLINK");
+        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(DEEP_LINK_URL));
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        context.startActivity(intent);
+        for (int i = 0; i < 3 && !seekAndClick("赚更多积分"); i++) { }   // H5 加载慢，重试锚点
+        state = State.DETERMIN;
+    }
 
-						if (DEVICE_NAME.equals("umi")) {
-							for (String awayBackText : awayBackTexts) {
-								if (text.contains(awayBackText)) {
-									obj.click();
-									isClicked = true;
-									Thread.sleep(WAIT_TIMEOUT);
-									// blacklist.add(text);
-									device.click(561, GO_FINISH_Y);
-									Thread.sleep(8888);
-									Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(DEEP_LINK_URL));
-									intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-									context.startActivity(intent);
-									break;
-								}
-							}
-							if (isClicked)
-								break;
-						}
+    /* ================= helpers ================= */
 
-					} catch (StaleObjectException e) {
-						logger("StaleObjectException, skipping...");
-                    }
-				}
-			}
+    private static Group matchGroup(String text) {
+        for (Group g : GROUPS) if (g.matches(text)) return g;
+        return null;
+    }
 
-			if (isClicked)
-				continue;
-			logger("No task found, checking for 换一换...");
-			justChange();
-		}
-	}
+    private boolean seekAndClick(String text) throws Exception {
+        Thread.sleep(WAIT_TIMEOUT);
+        UiObject2 obj = device.findObject(By.text(text));
+        if (obj == null) { logger("Not found: " + text); return false; }
+        logger("Found and clicked: " + text);
+        obj.click();
+        Thread.sleep(WAIT_TIMEOUT);
+        return true;
+    }
 
-	private void startOver() throws Exception {
-		logger("Starting over...");
-		if (isBackToStartPage() == false) {
-			Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(DEEP_LINK_URL));
-			intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-			context.startActivity(intent);
-			Thread.sleep(WAIT_TIMEOUT);
-			seekAndClick("赚更多积分");
-		} else {
-			logger("Already in start page, no need to startover");
-		}
-	}
+    private String screenText() {
+        return String.join("", extractAndLogTexts(device.findObjects(By.clazz("android.widget.TextView"))));
+    }
 
-	private void logger(String msg) {
-		Log.d("FuxRiver19890604", msg);
-	}
+    private static String safeText(UiObject2 obj) {
+        try { return obj.getText(); } catch (Exception e) { return null; }
+    }
 
-	private List<String> extractAndLogTexts(List<UiObject2> objs) {
-		List<String> textList = new ArrayList<>();
-		
-		if (objs == null || objs.isEmpty()) {
-			logger("未找到任何匹配的节点。");
-			return textList;
-		}
+    private static int hitCount(String screen, String[] markers) {
+        int n = 0;
+        for (String m : markers) if (screen.contains(m)) n++;
+        return n;
+    }
 
-		// 1. 遍历并过滤：仅保留包含中文的字符串
-		for (UiObject2 obj : objs) {
-			try {
-				String text = obj.getText();
-				// 判空 + 正则匹配：[\u4e00-\u9fa5] 匹配基本中文字符
-				if (text != null && !text.trim().isEmpty() && text.matches(".*[\\u4e00-\\u9fa5].*")) {
-					textList.add(text);
-				}
-			} catch (Exception e) {
-				// 忽略节点失效 (StaleObjectException) 等异常，防止脚本崩溃
-			}
-		}
-		
-		// 2. 一口气打印结果
-		if (textList.isEmpty()) {
-			logger("提取完成，当前屏幕未发现包含中文的文本。");
-		} else {
-			// 核心拼接逻辑：将 List 转换为 「文本1」「文本2」「文本3」 的格式
-			String joinedTexts = "「" + String.join("」「", textList) + "」";
-			logger("提取完成 (共 " + textList.size() + " 条): " + joinedTexts);
-		}
-		
-		return textList;
-	}
+    private static boolean containsAny(String screen, String[] markers) {
+        for (String m : markers) if (screen.contains(m)) return true;
+        return false;
+    }
 
-	/**
-	 * 判断当前是否回到了起点页面。
-	 * 依据：检查屏幕上是否出现了特定的特征字符串，如果命中数量 > 3（即至少4个），则认为是起点。
-	 *
-	 * @return true 表示回到了起点页面，false 表示没有
-	 */
-	private boolean isBackToStartPage() {
-		// 1. 定义特征字符串
-		String[] markers = {
-			"赚更多积分", 
-			"我已连签", 
-			"连签奖励", 
-			"兑好物", 
-			"恭喜完成今日", 
-			"福利任务", 
-			"继续做任务赚积分吧"
-		};
+    private void logger(String msg) { Log.d(TAG, msg); }
 
-		// 2. 一次性获取当前屏幕所有 TextView 的文本（避免多次查询 UI 树）
-		StringBuilder screenTextBuilder = new StringBuilder();
-		List<UiObject2> textViews = device.findObjects(By.clazz("android.widget.TextView"));
-
-		for (UiObject2 obj : textViews) {
-			try {
-				String text = obj.getText();
-				if (text != null) {
-					screenTextBuilder.append(text);
-				}
-			} catch (Exception e) {
-				// 忽略节点失效异常 (StaleObjectException)
-			}
-		}
-		String screenText = screenTextBuilder.toString();
-
-		// 3. 统计命中了多少个特征字符串
-		int matchCount = 0;
-		for (String marker : markers) {
-			if (screenText.contains(marker)) {
-				matchCount++;
-				// 优化：如果已经满足条件（>3），直接提前退出循环
-				if (matchCount > 3) {
-					break; 
-				}
-			}
-		}
-
-		// 4. 打印日志并返回结果
-		logger("起点页面特征匹配数: " + matchCount + " / " + markers.length);
-		
-		// 需求是“超过3个”，即 >= 4
-		return matchCount > 3;
-	}
+    private List<String> extractAndLogTexts(List<UiObject2> objs) {
+        List<String> textList = new ArrayList<>();
+        if (objs == null || objs.isEmpty()) { logger("未找到任何匹配的节点。"); return textList; }
+        for (UiObject2 obj : objs) {
+            try {
+                String text = obj.getText();
+                if (text != null && !text.trim().isEmpty() && text.matches(".*[\\u4e00-\\u9fa5].*")) {
+                    textList.add(text);
+                }
+            } catch (Exception e) { /* 忽略节点失效 */ }
+        }
+        if (textList.isEmpty()) {
+            logger("提取完成，当前屏幕未发现包含中文的文本。");
+        } else {
+            logger("提取完成 (共 " + textList.size() + " 条): 「" + String.join("」「", textList) + "」");
+        }
+        return textList;
+    }
 }
