@@ -8,6 +8,7 @@ import androidx.test.uiautomator.UiDevice;
 import androidx.test.uiautomator.UiObject2;
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry;
 import androidx.test.runner.lifecycle.Stage;
+import android.util.Log;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
@@ -298,6 +299,6 @@ public class AlipaySignInTest {
 	 * 日志输出
 	 */
 	private void logger(String msg) {
-		System.out.println("[AlipaySignIn113] " + msg);
+		Log.d("FuxRiver19890604", msg);
 	}
 }
