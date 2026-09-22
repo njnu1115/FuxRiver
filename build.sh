@@ -17,19 +17,19 @@ LOGCAT_PID=""
 cleanup() {
     echo ""
     echo ">>> 捕获到中断信号，正在执行清理操作..."
-    
+
     # 1. 停止后台的 logcat 进程
     if [ -n "$LOGCAT_PID" ]; then
         kill $LOGCAT_PID 2>/dev/null
         wait $LOGCAT_PID 2>/dev/null # 等待进程彻底结束，防止僵尸进程
         echo ">>> 已停止后台 logcat (PID: $LOGCAT_PID)"
     fi
-    
+
     # 2. 停止目标应用
     adb shell am force-stop cn.demo.xriver.test
-    
+
     echo ">>> 清理完成，准备退出脚本。"
-    exit 0 
+    exit 0
 }
 
 # 捕获 SIGINT (Ctrl+C) 和 SIGTERM 信号
