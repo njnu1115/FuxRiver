@@ -45,25 +45,23 @@ public class AlipaySignInTest {
     private static final int GO_FINISH_Y = DEVICE_NAME.equals("umi") ? 1600 : 2085;
 
     /* ================= 状态机参数 ================= */
-    private static final long TICK_MS           = 3000;    // HOLDOVER 心跳
-    private static final long PRESSBACK_HOLD_MS = 10000;   // PRESSBACK 停留 10s
+    private static final long TICK_MS           = 18000;    // HOLDOVER 心跳
+    private static final long PRESSBACK_HOLD_MS = 1000;   // PRESSBACK 停留 10s
     private static final long SETTLE_MS         = 1500;    // DETERMIN 观察前的稳定等待
     private static final int  MAX_PRESSBACK     = 1000;    // counter 上限 → 结束
     private static final int  MAX_TASKS         = 64;      // 任务数上限
     private static final int  MAX_EMPTY_START   = 5;       // 连续捡不到任务的空轮上限
     private static final long HOLD_MS           = 18_000;  // 统一等待（覆盖 3s/15s 等任务）
-    private static final Pattern TASK_FILTER = Pattern.compile("\\+3积分|\\+5积分|5分钟");
+    private static final Pattern TASK_FILTER = Pattern.compile("\\+3积分|\\+5积分|5分钟|玩一玩");
 
     /* ================= 状态判定字符串 ================= */
     private static final String[] START_MARKERS = {
             "已完成", "连签", "已领取", "兑好物", "今天","明天", "后天", 
             "恭喜完成今日", "福利任务", "继续做任务赚积分吧"};
     private static final String[] HOME_MARKERS = {
-            "扫一扫", "收付款", "卡包", "出行", "我的"};
-    private static final String[] HOLDOVER_MARKERS = {      // DETERMIN 认定"还在任务页"
-            "已获得奖励", "账号风险检测", "账号风险监测", "通用任务悬浮球"};
+            "扫一扫", "收付款", "卡包", "出行", "我的", "支付宝", "微信", "设置"};
+	private static final Pattern HOLDOVER_PATTERN = Pattern.compile("看一看5分钟得奖励|剩余 \\d+ 秒");
     private static final String[] DONE_MARKERS  = {"已获得奖励"};                    // 提前完成
-    private static final String[] POPUP_MARKERS = {"账号风险检测", "账号风险监测", "登录"}; // 弹窗 → back 压掉
 
     /* ================= 状态机 ================= */
     private enum State { DETERMIN, HOME, START, HOLDOVER, PRESSBACK }
@@ -122,9 +120,9 @@ public class AlipaySignInTest {
             } catch (Exception e) { /* 忽略节点失效 */ }
         }
 
-        if (hitCount(screen, START_MARKERS) > 3)    { state = State.START;    return; }
-        if (containsAny(screen, HOLDOVER_MARKERS)) { state = State.HOLDOVER; return; }
-        if (hitCount(screen, HOME_MARKERS) >= 2)   { state = State.HOME;     return; }
+        if (hitCount(screen, START_MARKERS) > 3)     { state = State.START;    return; }
+        if (HOLDOVER_PATTERN.matcher(screen).find()) { state = State.HOLDOVER; return; }
+        if (hitCount(screen, HOME_MARKERS) >= 2)     { state = State.HOME;     return; }
         state = State.PRESSBACK;   // nothing found
     }
 
@@ -176,37 +174,44 @@ public class AlipaySignInTest {
      * 已删除 scroll 分支 —— 不再按文本区分滑动任务，所有任务统一等待。
      */
     private void doHoldover() throws Exception {
-        if (System.currentTimeMillis() >= deadline) {                              // timeout reached
-            logger("HOLDOVER: timeout -> pressBack -> DETERMIN");
-            device.pressBack();
-            state = State.DETERMIN;
-            return;
-        }
+//       if (System.currentTimeMillis() >= deadline) {                              // timeout reached
+//           logger("HOLDOVER: timeout -> pressBack -> DETERMIN");
+//           device.pressBack();
+//           state = State.DETERMIN;
+//           return;
+//       }
 
         Thread.sleep(TICK_MS);
-        String screen = screenText();
-
-        if (containsAny(screen, DONE_MARKERS)) {           // 提前完成，省时间
-            logger("HOLDOVER: 已获得奖励 -> pressBack -> DETERMIN");
-            device.pressBack();
-            state = State.DETERMIN;
-            return;
-        }
-        if (containsAny(screen, POPUP_MARKERS)) {          // 风控/登录弹窗 → back 压掉
-            device.pressBack();
-            return;
-        }
+		state = State.DETERMIN;
         // 无 scroll，统一等待
     }
 
     /** PRESSBACK：hold 10s → pressBack → counter++ → DETERMIN */
-    private void doPressBack() throws Exception {
-        Thread.sleep(PRESSBACK_HOLD_MS);
-        device.pressBack();
-        pressBackCount++;
-        logger("PRESSBACK: counter=" + pressBackCount);
-        state = State.DETERMIN;
-    }
+	private void doPressBack() throws Exception {
+		Thread.sleep(PRESSBACK_HOLD_MS);
+		String currentPkg = device.getCurrentPackageName();
+
+		// 需要连续按两次返回的包名列表
+		boolean needDoubleBack = 
+				"com.taobao.taobao".equals(currentPkg)          // 淘宝
+				|| "com.baidu.searchbox".equals(currentPkg)    // 百度App
+				|| "com.baidu.searchbox.lite".equals(currentPkg)//百度极速版
+				|| "com.taobao.etao".equals(currentPkg)        // 一淘
+				|| "com.sankuai.meituan".equals(currentPkg)    // 美团
+				|| "com.kuaishou.nebula".equals(currentPkg);   // 快手
+
+		device.pressBack();
+		pressBackCount++;
+		logger("PRESSBACK: counter=" + pressBackCount + ", currentPkg=" + currentPkg);
+
+		if (needDoubleBack) {
+			Thread.sleep(300); // 两次返回之间间隔，按需调整
+			device.pressBack();
+			pressBackCount++;
+			logger("PRESSBACK: Double back for target app, counter=" + pressBackCount);
+		}
+		state = State.DETERMIN;
+	}
 
     /** HOME：deeplink 回起点 → DETERMIN（进入 HOME 本身就说明不在起点，无需再判断） */
     private void startOver() throws Exception {
@@ -241,11 +246,6 @@ public class AlipaySignInTest {
         int n = 0;
         for (String m : markers) if (screen.contains(m)) n++;
         return n;
-    }
-
-    private static boolean containsAny(String screen, String[] markers) {
-        for (String m : markers) if (screen.contains(m)) return true;
-        return false;
     }
 
     private void logger(String msg) { Log.d(TAG, msg); }
