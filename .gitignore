@@ -12,6 +12,7 @@
 *.ipr
 *.iws
 .gradle/
+gradle/wrapper/gradle-wrapper.jar
 local.properties
 
 # VS Code
