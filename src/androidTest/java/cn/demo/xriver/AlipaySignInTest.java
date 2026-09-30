@@ -18,6 +18,10 @@ import java.util.regex.Pattern;
 
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
 
+/*
+项目决策过程可参见 https://chat.z.ai/s/6c1e5d8e-7247-4c3e-99d3-878d7861554e
+*/
+
 /**
  * @startuml
  * [*] --> DETERMIN : Launch
@@ -65,7 +69,7 @@ public class AlipaySignInTest {
 
     private UiDevice device;
     private Context context;
-
+    private boolean scrollFlag = false;
     private State state = State.DETERMIN;   // [*] --> DETERMIN : Launch
     private List<UiObject2> lastDump;       // DETERMIN 的 dump，传给 START 复用
     private final Random rnd = new Random();
@@ -82,7 +86,7 @@ public class AlipaySignInTest {
     public void testAlipaySignIn() throws Exception {
         long t0 = System.currentTimeMillis();
         long budgetEnd = t0 + RUN_BUDGET_MS;
-        bool scrollFlag = false;
+
         while (System.currentTimeMillis() < budgetEnd) {
             logger("== state :=" + state );
             switch (state) {
@@ -123,22 +127,28 @@ public class AlipaySignInTest {
                 }
             }
         }
-        logger("candidate 选举完成 (共 " + candidates.size() + " 条): 「" + String.join("」「", candidates) + "」");
+
 
         if (candidates.isEmpty()) {
             logger("START: no task  -> 换一换 or 赚更多积分");
             List<UiObject2> refresh = device.findObjects(By.text(Pattern.compile("换一换|赚更多积分")));
-            if (!refresh.isEmpty()) { refresh.get(0).click(); Thread.sleep(WAIT_TIMEOUT); }
+            if (!refresh.isEmpty()) {
+                refresh.get(0).click(); Thread.sleep(WAIT_TIMEOUT); 
+            }else{ // 如果换一换 和 赚更多积分都没有，就往上滑一点点
+                device.swipe(498, 999, 502, 666, 20);
+            }
             state = State.DETERMIN;      // 回 DETERMIN 重新 dump
             return;                      // ★ 关键：不落入下面的任务点击流程
         }
+        int randomIndex = rnd.nextInt(candidates.size());
         String pick = candidates.get(rnd.nextInt(candidates.size()));
+        logger("candidate 选举完成 (共 " + candidates.size() + " 条): 「" + String.join("」「", candidates) + "」" + "picked: >>>>" + pick);
         UiObject2 obj = device.findObject(By.text(pick));
         if (obj == null) { logger("pick vanished -> PRESSBACK"); state = State.PRESSBACK; return; }
-        if (pick.contains("滑动")){scrollFlag = true;}
+        if (pick.contains("+5秒")){scrollFlag = true;}
 
         obj.click();                           // ── randomClick ──
-        Thread.sleep(WAIT_TIMEOUT);
+        Thread.sleep(2000);
         device.click(561, GO_FINISH_Y);        // "去完成"
         state = State.HOLDOVER;
     }
@@ -149,15 +159,8 @@ public class AlipaySignInTest {
      */
     private void doHoldover() throws Exception {
         if(scrollFlag){
-            int width = device.getDisplayWidth();
-            int height = device.getDisplayHeight();
-            int startX = width / 2;
-            int startY = (int) (height * 0.6); // 起点：屏幕高度的 80% 处
-            int endX = width / 2;
-            int endY = (int) (height * 0.4);   // 终点：屏幕高度的 20% 处
-            int steps = 20;
             for (int i = 0; i < 6; i++) {
-                device.swipe(startX, startY, endX, endY, steps);
+                device.swipe(498, 999, 502, 666, 20);
                 Thread.sleep(3333); 
             }
             scrollFlag = false;
