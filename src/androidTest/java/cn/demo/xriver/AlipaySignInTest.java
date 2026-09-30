@@ -62,7 +62,8 @@ public class AlipaySignInTest {
             "恭喜完成今日", "福利任务", "继续做任务赚积分吧"};
     private static final String[] HOME_MARKERS = {
             "扫一扫", "收付款", "卡包", "出行", "我的", "支付宝", "微信", "设置"};
-	private static final Pattern HOLDOVER_PATTERN = Pattern.compile("看一看5分钟得奖励|剩余 [1-9]\\d* 秒");
+	private static final Pattern HOLDOVER_PATTERN_STAY = Pattern.compile("看一看5分钟得奖励");
+	private static final Pattern HOLDOVER_PATTERN_SCROLL = Pattern.compile("剩余 [1-9]\\d* 秒");
 
     /* ================= 状态机 ================= */
     private enum State { DETERMIN, HOME, START, HOLDOVER, PRESSBACK }
@@ -108,7 +109,8 @@ public class AlipaySignInTest {
         String screen = String.join("", extractAndLogTexts(lastDump));
 
         if (hitCount(screen, START_MARKERS) > 3)     { state = State.START;    return; }
-        if (HOLDOVER_PATTERN.matcher(screen).find()) { state = State.HOLDOVER; return; }
+        if (HOLDOVER_PATTERN_STAY.matcher(screen).find()) { state = State.HOLDOVER; return; }
+        if (HOLDOVER_PATTERN_SCROLL.matcher(screen).find()) { scrollFlag = true; state = State.HOLDOVER; return; }
         if (hitCount(screen, HOME_MARKERS) >= 2)     { state = State.HOME;     return; }
         state = State.PRESSBACK;   // nothing found
     }
@@ -159,6 +161,7 @@ public class AlipaySignInTest {
      */
     private void doHoldover() throws Exception {
         if(scrollFlag){
+            logger("HOLDOVER: scrollFlag = true");
             for (int i = 0; i < 6; i++) {
                 device.swipe(498, 999, 502, 666, 20);
                 Thread.sleep(3333); 
@@ -178,11 +181,13 @@ public class AlipaySignInTest {
 		// 需要连续按两次返回的包名列表
 		boolean needDoubleBack = 
 				"com.taobao.taobao".equals(currentPkg)          // 淘宝
-				|| "com.baidu.searchbox".equals(currentPkg)    // 百度App
+				||"com.taobao.litetao".equals(currentPkg)      // 淘宝极速版
+                || "com.baidu.searchbox".equals(currentPkg)    // 百度App
 				|| "com.baidu.searchbox.lite".equals(currentPkg)//百度极速版
 				|| "com.taobao.etao".equals(currentPkg)        // 一淘
 				|| "com.sankuai.meituan".equals(currentPkg)    // 美团
 				|| "com.kuaishou.nebula".equals(currentPkg);   // 快手
+                
 
 		device.pressBack();
 		logger("PRESSBACK:" + ", currentPkg=" + currentPkg);
