@@ -42,26 +42,23 @@ public class AlipaySignInTest {
             "alipays://platformapi/startapp?appId=68687805&url=https%3A%2F%2Frender.alipay.com%2Fp%2Fyuyan%2F180020380000000023%2Fpoint-sign-in.html";
     private static final long WAIT_TIMEOUT = 1000;
     private static final String DEVICE_NAME = android.os.Build.DEVICE;
-    private static final int GO_FINISH_Y = DEVICE_NAME.equals("umi") ? 1600 : 2085;
+    private static final int GO_FINISH_Y = DEVICE_NAME.equals("umi") ? 1600 : 2100;
 
     /* ================= 状态机参数 ================= */
-    private static final long TICK_MS           = 18000;    // HOLDOVER 心跳
+    private static final long RUN_BUDGET_MS = 60 * 60 * 1000L;   // 唯一退出条件
+    private static final long HOLDOVER_DWELL_MS           = 18000;    // HOLDOVER 等待
     private static final long PRESSBACK_HOLD_MS = 1000;   // PRESSBACK 停留 10s
     private static final long SETTLE_MS         = 1500;    // DETERMIN 观察前的稳定等待
-    private static final int  MAX_PRESSBACK     = 1000;    // counter 上限 → 结束
-    private static final int  MAX_TASKS         = 64;      // 任务数上限
-    private static final int  MAX_EMPTY_START   = 5;       // 连续捡不到任务的空轮上限
-    private static final long HOLD_MS           = 18_000;  // 统一等待（覆盖 3s/15s 等任务）
     private static final Pattern TASK_FILTER = Pattern.compile("\\+3积分|\\+5积分|5分钟|玩一玩");
 
     /* ================= 状态判定字符串 ================= */
+    private static final Pattern ANY_CN_TEXT = Pattern.compile(".*[\\\\u4e00-\\\\u9fa5].*");
     private static final String[] START_MARKERS = {
             "已完成", "连签", "已领取", "兑好物", "今天","明天", "后天", 
             "恭喜完成今日", "福利任务", "继续做任务赚积分吧"};
     private static final String[] HOME_MARKERS = {
             "扫一扫", "收付款", "卡包", "出行", "我的", "支付宝", "微信", "设置"};
-	private static final Pattern HOLDOVER_PATTERN = Pattern.compile("看一看5分钟得奖励|剩余 \\d+ 秒");
-    private static final String[] DONE_MARKERS  = {"已获得奖励"};                    // 提前完成
+	private static final Pattern HOLDOVER_PATTERN = Pattern.compile("看一看5分钟得奖励|剩余 [1-9]\\d* 秒");
 
     /* ================= 状态机 ================= */
     private enum State { DETERMIN, HOME, START, HOLDOVER, PRESSBACK }
@@ -71,10 +68,6 @@ public class AlipaySignInTest {
 
     private State state = State.DETERMIN;   // [*] --> DETERMIN : Launch
     private List<UiObject2> lastDump;       // DETERMIN 的 dump，传给 START 复用
-    private long deadline;                  // HOLDOVER 截止时间
-    private int pressBackCount;             // 图中的 counter
-    private int taskCount;
-    private int emptyStart;
     private final Random rnd = new Random();
 
     @Before
@@ -88,37 +81,27 @@ public class AlipaySignInTest {
     @Test
     public void testAlipaySignIn() throws Exception {
         long t0 = System.currentTimeMillis();
-        while (pressBackCount < MAX_PRESSBACK && taskCount < MAX_TASKS && emptyStart < MAX_EMPTY_START) {
-            logger("== state=" + state + " tasks=" + taskCount + " backs=" + pressBackCount);
+        long budgetEnd = t0 + RUN_BUDGET_MS;
+        bool scrollFlag = false;
+        while (System.currentTimeMillis() < budgetEnd) {
+            logger("== state :=" + state );
             switch (state) {
                 case DETERMIN:  determine();       break;
-                case HOME:      startOver();       break;   // --> DETERMIN
+                case HOME:      startOver();       break;
                 case START:     doStart(lastDump); break;
                 case HOLDOVER:  doHoldover();      break;
                 case PRESSBACK: doPressBack();     break;
             }
         }
-        logger("Finished: tasks=" + taskCount + ", counter=" + pressBackCount
-                + ", " + (System.currentTimeMillis() - t0) / 1000 + "s");
+        logger("======== Finished ========");
     }
 
     /** DETERMIN：整页 dump 一次，分类；dump 通过 lastDump 传给 START */
     private void determine() throws Exception {
         Thread.sleep(SETTLE_MS);
         lastDump = device.findObjects(By.clazz("android.widget.TextView"));   // 全流程唯一一次整页 dump
+        // lastDump = device.findObjects(By.text(ANY_CN_TEXT));
         String screen = String.join("", extractAndLogTexts(lastDump));
-
-        for (UiObject2 obj : lastDump) {
-            try {
-                String text = obj.getText();
-                if (text != null && !text.trim().isEmpty() && text.equals("赚更多积分")) {
-                    logger("赚更多积分 found, click and re-determin");
-                    obj.click();
-                    state = State.DETERMIN; 
-                    return;
-                }
-            } catch (Exception e) { /* 忽略节点失效 */ }
-        }
 
         if (hitCount(screen, START_MARKERS) > 3)     { state = State.START;    return; }
         if (HOLDOVER_PATTERN.matcher(screen).find()) { state = State.HOLDOVER; return; }
@@ -140,32 +123,23 @@ public class AlipaySignInTest {
                 }
             }
         }
-        logger("candidate选举完成 (共 " + candidates.size() + " 条): 「" + String.join("」「", candidates) + "」");
+        logger("candidate 选举完成 (共 " + candidates.size() + " 条): 「" + String.join("」「", candidates) + "」");
 
-        String pick;
-        if (!candidates.isEmpty())
-        {
-            pick = candidates.get(rnd.nextInt(candidates.size()));
-            logger("pick: 「" + pick + "」 (random from " + candidates.size() + ")");
+        if (candidates.isEmpty()) {
+            logger("START: no task  -> 换一换 or 赚更多积分");
+            List<UiObject2> refresh = device.findObjects(By.text(Pattern.compile("换一换|赚更多积分")));
+            if (!refresh.isEmpty()) { refresh.get(0).click(); Thread.sleep(WAIT_TIMEOUT); }
+            state = State.DETERMIN;      // 回 DETERMIN 重新 dump
+            return;                      // ★ 关键：不落入下面的任务点击流程
         }
-        else
-        {
-            emptyStart++;
-            logger("START: no task found, click 换一换");
-            pick = "换一换";
-            state = State.DETERMIN;
-        }
-
+        String pick = candidates.get(rnd.nextInt(candidates.size()));
         UiObject2 obj = device.findObject(By.text(pick));
         if (obj == null) { logger("pick vanished -> PRESSBACK"); state = State.PRESSBACK; return; }
+        if (pick.contains("滑动")){scrollFlag = true;}
 
         obj.click();                           // ── randomClick ──
         Thread.sleep(WAIT_TIMEOUT);
         device.click(561, GO_FINISH_Y);        // "去完成"
-
-        deadline = System.currentTimeMillis() + HOLD_MS;   // set timeout
-        taskCount++;
-        emptyStart = 0;
         state = State.HOLDOVER;
     }
 
@@ -174,15 +148,22 @@ public class AlipaySignInTest {
      * 已删除 scroll 分支 —— 不再按文本区分滑动任务，所有任务统一等待。
      */
     private void doHoldover() throws Exception {
-//       if (System.currentTimeMillis() >= deadline) {                              // timeout reached
-//           logger("HOLDOVER: timeout -> pressBack -> DETERMIN");
-//           device.pressBack();
-//           state = State.DETERMIN;
-//           return;
-//       }
-
-        Thread.sleep(TICK_MS);
-		state = State.DETERMIN;
+        if(scrollFlag){
+            int width = device.getDisplayWidth();
+            int height = device.getDisplayHeight();
+            int startX = width / 2;
+            int startY = (int) (height * 0.6); // 起点：屏幕高度的 80% 处
+            int endX = width / 2;
+            int endY = (int) (height * 0.4);   // 终点：屏幕高度的 20% 处
+            int steps = 20;
+            for (int i = 0; i < 6; i++) {
+                device.swipe(startX, startY, endX, endY, steps);
+                Thread.sleep(3333); 
+            }
+            scrollFlag = false;
+        }
+        else{Thread.sleep(HOLDOVER_DWELL_MS);}
+        state = State.DETERMIN;
         // 无 scroll，统一等待
     }
 
@@ -201,14 +182,12 @@ public class AlipaySignInTest {
 				|| "com.kuaishou.nebula".equals(currentPkg);   // 快手
 
 		device.pressBack();
-		pressBackCount++;
-		logger("PRESSBACK: counter=" + pressBackCount + ", currentPkg=" + currentPkg);
+		logger("PRESSBACK:" + ", currentPkg=" + currentPkg);
 
 		if (needDoubleBack) {
 			Thread.sleep(300); // 两次返回之间间隔，按需调整
 			device.pressBack();
-			pressBackCount++;
-			logger("PRESSBACK: Double back for target app, counter=" + pressBackCount);
+			logger("PRESSBACK: Double back for target app." );
 		}
 		state = State.DETERMIN;
 	}
@@ -216,27 +195,13 @@ public class AlipaySignInTest {
     /** HOME：deeplink 回起点 → DETERMIN（进入 HOME 本身就说明不在起点，无需再判断） */
     private void startOver() throws Exception {
         logger("HOME: startOver via DEEPLINK");
-        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(DEEP_LINK_URL));
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        context.startActivity(intent);
+        context.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(DEEP_LINK_URL))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        Thread.sleep(2500);          // 给 H5 加载时间，避免 HOME↔DETERMIN 快速互跳
         state = State.DETERMIN;
     }
 
     /* ================= helpers ================= */
-
-    // private boolean seekAndClick(String text) throws Exception {
-    //     Thread.sleep(WAIT_TIMEOUT);
-    //     UiObject2 obj = device.findObject(By.text(text));
-    //     if (obj == null) { logger("Not found: " + text); return false; }
-    //     logger("Found and clicked: " + text);
-    //     obj.click();
-    //     Thread.sleep(WAIT_TIMEOUT);
-    //     return true;
-    // }
-
-    private String screenText() {
-        return String.join("", extractAndLogTexts(device.findObjects(By.clazz("android.widget.TextView"))));
-    }
 
     private static String safeText(UiObject2 obj) {
         try { return obj.getText(); } catch (Exception e) { return null; }

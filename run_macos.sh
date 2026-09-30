@@ -8,6 +8,8 @@ export PATH=$PATH:/Users/cl/opt/scrcpy-macos-aarch64-v4.0
 export ANDROID_SERIAL=SGD6IZGQGUIF9LZL
 # export ANDROID_SERIAL=662846a7
 # export ANDROID_SERIAL=192.168.1.240:33333
+PKG_LIST="com.eg.android.AlipayGphone com.taobao.taobao com.baidu.searchbox \
+com.baidu.searchbox.lite com.taobao.etao com.sankuai.meituan com.kuaishou.nebula"
 
 #!/bin/bash
 
@@ -65,3 +67,6 @@ if [ -n "$LOGCAT_PID" ]; then
     echo ""
     echo ">>> 测试运行结束，已关闭后台 logcat。"
 fi
+
+# 收尾清理
+for p in $PKG_LIST; do adb shell am force-stop "$p"; done
