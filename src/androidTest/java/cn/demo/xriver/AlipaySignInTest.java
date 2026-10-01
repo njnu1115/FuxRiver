@@ -46,23 +46,22 @@ public class AlipaySignInTest {
             "alipays://platformapi/startapp?appId=68687805&url=https%3A%2F%2Frender.alipay.com%2Fp%2Fyuyan%2F180020380000000023%2Fpoint-sign-in.html";
     private static final long WAIT_TIMEOUT = 1000;
     private static final String DEVICE_NAME = android.os.Build.DEVICE;
-    private static final int GO_FINISH_Y = DEVICE_NAME.equals("umi") ? 1600 : 2100;
+    private static final int GO_FINISH_Y = DEVICE_NAME.equals("umi") ? 1560 : 2100;
 
     /* ================= 状态机参数 ================= */
     private static final long RUN_BUDGET_MS = 60 * 60 * 1000L;   // 唯一退出条件
     private static final long HOLDOVER_DWELL_MS           = 18000;    // HOLDOVER 等待
     private static final long PRESSBACK_HOLD_MS = 1000;   // PRESSBACK 停留 10s
-    private static final long SETTLE_MS         = 1500;    // DETERMIN 观察前的稳定等待
-    private static final Pattern TASK_FILTER = Pattern.compile("\\+3积分|\\+5积分|5分钟|玩一玩");
+    private static final Pattern TASK_FILTER = Pattern.compile("\\+3积分|\\+5积分|5分钟|玩一玩|换一换|再领6积分");
 
     /* ================= 状态判定字符串 ================= */
     private static final Pattern ANY_CN_TEXT = Pattern.compile(".*[\\\\u4e00-\\\\u9fa5].*");
     private static final String[] START_MARKERS = {
-            "已完成", "连签", "已领取", "兑好物", "今天","明天", "后天", 
-            "恭喜完成今日", "福利任务", "继续做任务赚积分吧"};
+            "已完成", "连签", "已领取", "兑好物", "今天","明天", "后天", "赚更多积分", "出行省更多", "+300积分", "+666积分", "+888积分", 
+            "恭喜完成今日", "福利任务", "继续做任务赚积分吧" ,"滑动浏览以下内容15秒" , "换一换"};
     private static final String[] HOME_MARKERS = {
             "扫一扫", "收付款", "卡包", "出行", "我的", "支付宝", "微信", "设置"};
-	private static final Pattern HOLDOVER_PATTERN_STAY = Pattern.compile("看一看5分钟得奖励");
+	private static final Pattern HOLDOVER_PATTERN_STAY = Pattern.compile("看一看5分钟得奖励|可得10积分|可得15积分|可得25积分");
 	private static final Pattern HOLDOVER_PATTERN_SCROLL = Pattern.compile("剩余 [1-9]\\d* 秒");
 
     /* ================= 状态机 ================= */
@@ -103,7 +102,8 @@ public class AlipaySignInTest {
 
     /** DETERMIN：整页 dump 一次，分类；dump 通过 lastDump 传给 START */
     private void determine() throws Exception {
-        Thread.sleep(SETTLE_MS);
+        Thread.sleep(1000);
+		if(!"com.eg.android.AlipayGphone".equals(device.getCurrentPackageName())){state = State.HOME; return;}
         lastDump = device.findObjects(By.clazz("android.widget.TextView"));   // 全流程唯一一次整页 dump
         // lastDump = device.findObjects(By.text(ANY_CN_TEXT));
         String screen = String.join("", extractAndLogTexts(lastDump));
@@ -130,28 +130,26 @@ public class AlipaySignInTest {
             }
         }
 
-
         if (candidates.isEmpty()) {
-            logger("START: no task  -> 换一换 or 赚更多积分");
-            List<UiObject2> refresh = device.findObjects(By.text(Pattern.compile("换一换|赚更多积分")));
-            if (!refresh.isEmpty()) {
-                refresh.get(0).click(); Thread.sleep(WAIT_TIMEOUT); 
-            }else{ // 如果换一换 和 赚更多积分都没有，就往上滑一点点
-                device.swipe(498, 999, 502, 666, 20);
-            }
+            logger("START: no task for choose, swipe up or down for lucky");
+			if (rnd.nextBoolean()) {device.swipe(498, 666, 502, 999, 20);}
+			else{ device.swipe(498, 999, 502, 666, 20);}
             state = State.DETERMIN;      // 回 DETERMIN 重新 dump
             return;                      // ★ 关键：不落入下面的任务点击流程
         }
+
         int randomIndex = rnd.nextInt(candidates.size());
         String pick = candidates.get(rnd.nextInt(candidates.size()));
         logger("candidate 选举完成 (共 " + candidates.size() + " 条): 「" + String.join("」「", candidates) + "」" + "picked: >>>>" + pick);
         UiObject2 obj = device.findObject(By.text(pick));
         if (obj == null) { logger("pick vanished -> PRESSBACK"); state = State.PRESSBACK; return; }
-        if (pick.contains("+5秒")){scrollFlag = true;}
+        if (pick.contains("+5积分")){scrollFlag = true;}
 
-        obj.click();                           // ── randomClick ──
+        obj.click();
         Thread.sleep(2000);
-        device.click(561, GO_FINISH_Y);        // "去完成"
+		if (pick.contains("换一换")){device.swipe(498, 555, 502, 666, 20);} // 点了换一换之后要往下滑动一点点否则下一轮dump不出来东西
+		else if(pick.contains("再领6积分")){Thread.sleep(20000);state = State.PRESSBACK;return;}
+		else{device.click(561, GO_FINISH_Y);}        // "去完成"
         state = State.HOLDOVER;
     }
 
@@ -162,7 +160,7 @@ public class AlipaySignInTest {
     private void doHoldover() throws Exception {
         if(scrollFlag){
             logger("HOLDOVER: scrollFlag = true");
-            for (int i = 0; i < 6; i++) {
+            for (int i = 0; i < 7; i++) {
                 device.swipe(498, 999, 502, 666, 20);
                 Thread.sleep(3333); 
             }
@@ -176,28 +174,10 @@ public class AlipaySignInTest {
     /** PRESSBACK：hold 10s → pressBack → counter++ → DETERMIN */
 	private void doPressBack() throws Exception {
 		Thread.sleep(PRESSBACK_HOLD_MS);
-		String currentPkg = device.getCurrentPackageName();
-
-		// 需要连续按两次返回的包名列表
-		boolean needDoubleBack = 
-				"com.taobao.taobao".equals(currentPkg)          // 淘宝
-				||"com.taobao.litetao".equals(currentPkg)      // 淘宝极速版
-                || "com.baidu.searchbox".equals(currentPkg)    // 百度App
-				|| "com.baidu.searchbox.lite".equals(currentPkg)//百度极速版
-				|| "com.taobao.etao".equals(currentPkg)        // 一淘
-				|| "com.sankuai.meituan".equals(currentPkg)    // 美团
-				|| "com.kuaishou.nebula".equals(currentPkg);   // 快手
-                
-
 		device.pressBack();
-		logger("PRESSBACK:" + ", currentPkg=" + currentPkg);
 
-		if (needDoubleBack) {
-			Thread.sleep(300); // 两次返回之间间隔，按需调整
-			device.pressBack();
-			logger("PRESSBACK: Double back for target app." );
-		}
-		state = State.DETERMIN;
+		if("com.eg.android.AlipayGphone".equals(device.getCurrentPackageName())){state = State.DETERMIN;}
+		else{state = State.HOME;}
 	}
 
     /** HOME：deeplink 回起点 → DETERMIN（进入 HOME 本身就说明不在起点，无需再判断） */
