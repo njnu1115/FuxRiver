@@ -4,6 +4,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.uiautomator.By;
 import androidx.test.uiautomator.UiDevice;
 import androidx.test.uiautomator.UiObject2;
+import androidx.test.uiautomator.StaleObjectException;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
@@ -52,7 +53,7 @@ public class AlipaySignInTest {
     private static final long RUN_BUDGET_MS = 60 * 60 * 1000L;   // 唯一退出条件
     private static final long HOLDOVER_DWELL_MS           = 18000;    // HOLDOVER 等待
     private static final long PRESSBACK_HOLD_MS = 1000;   // PRESSBACK 停留 10s
-    private static final Pattern TASK_FILTER = Pattern.compile("\\+3积分|\\+5积分|5分钟|玩一玩|换一换|再领6积分");
+    private static final Pattern TASK_FILTER = Pattern.compile("\\+3积分|\\+5积分|5分钟|3集|玩一玩|换一换");
 
     /* ================= 状态判定字符串 ================= */
     private static final Pattern ANY_CN_TEXT = Pattern.compile(".*[\\\\u4e00-\\\\u9fa5].*");
@@ -61,7 +62,7 @@ public class AlipaySignInTest {
             "恭喜完成今日", "福利任务", "继续做任务赚积分吧" ,"滑动浏览以下内容15秒" , "换一换"};
     private static final String[] HOME_MARKERS = {
             "扫一扫", "收付款", "卡包", "出行", "我的", "支付宝", "微信", "设置"};
-	private static final Pattern HOLDOVER_PATTERN_STAY = Pattern.compile("看一看5分钟得奖励|可得10积分|可得15积分|可得25积分");
+	private static final Pattern HOLDOVER_PATTERN_STAY = Pattern.compile("看一看5分钟得奖励|可得10积分|得15积分|可得25积分");
 	private static final Pattern HOLDOVER_PATTERN_SCROLL = Pattern.compile("剩余 [1-9]\\d* 秒");
 
     /* ================= 状态机 ================= */
@@ -120,35 +121,40 @@ public class AlipaySignInTest {
      * 随机挑一个文本，按文本重新查一次（避免列表滚过拿旧坐标），点击，进入 HOLDOVER。
      */
     private void doStart(List<UiObject2> dump) throws Exception {
-        List<String> candidates = new ArrayList<>();
+        List<UiObject2> candidates = new ArrayList<>();
         if (dump != null) {
             for (UiObject2 obj : dump) {
                 String text = safeText(obj);
                 if (text != null && TASK_FILTER.matcher(text).find()) {
-                    candidates.add(text);
+                    candidates.add(obj);
                 }
             }
         }
 
         if (candidates.isEmpty()) {
             logger("START: no task for choose, swipe up or down for lucky");
-			if (rnd.nextBoolean()) {device.swipe(498, 666, 502, 999, 20);}
-			else{ device.swipe(498, 999, 502, 666, 20);}
-            state = State.DETERMIN;      // 回 DETERMIN 重新 dump
-            return;                      // ★ 关键：不落入下面的任务点击流程
+            if (rnd.nextBoolean()) { device.swipe(498, 666, 502, 999, 20); }
+            else                   { device.swipe(498, 999, 502, 666, 20); }
+            state = State.DETERMIN;
+            return;
         }
 
-        int randomIndex = rnd.nextInt(candidates.size());
-        String pick = candidates.get(rnd.nextInt(candidates.size()));
-        logger("candidate 选举完成 (共 " + candidates.size() + " 条): 「" + String.join("」「", candidates) + "」" + "picked: >>>>" + pick);
-        UiObject2 obj = device.findObject(By.text(pick));
-        if (obj == null) { logger("pick vanished -> PRESSBACK"); state = State.PRESSBACK; return; }
-        if (pick.contains("+5积分")){scrollFlag = true;}
+        UiObject2 pickObj = candidates.get(rnd.nextInt(candidates.size()));
+        String pick = safeText(pickObj);
+        if (pick == null) { state = State.DETERMIN; return; }
+        logger("candidate 选举完成 (共 " + candidates.size() + " 条) picked: >>>>" + pick);
 
-        obj.click();
-        Thread.sleep(2000);
-		if (pick.contains("换一换")){device.swipe(498, 555, 502, 666, 20);} // 点了换一换之后要往下滑动一点点否则下一轮dump不出来东西
-		else if(pick.contains("再领6积分")){Thread.sleep(20000);state = State.PRESSBACK;return;}
+        try {
+            pickObj.click();
+        } catch (StaleObjectException e) {          // 旧节点也死了才走这条路
+            logger("pickObj.click() exception, pick stale -> PRESSBACK");
+            state = State.PRESSBACK;
+            return;
+        }
+
+        Thread.sleep(1812);
+        if (pick.contains("+5积分")){scrollFlag = true;}
+		if (pick.contains("换一换")){device.swipe(498, 555, 502, 666, 20);} // 点了换一换之后要往下滑动一点点否则下一轮dump不出来东西,但不需要点“去完成”
 		else{device.click(561, GO_FINISH_Y);}        // "去完成"
         state = State.HOLDOVER;
     }
