@@ -20,6 +20,9 @@ case "$OS_TYPE" in
         ;;
     MINGW*|MSYS*|CYGWIN*)
         echo "当前是 Windows (Git Bash / MinGW / MSYS / Cygwin)"
+		export JAVA_HOME=/d/opt64/android/studio/jbr
+		export ANDROID_HOME=/d/opt64/android/sdk
+		export PATH=$PATH:/d/opt64/scrcpy-win64-v4.1
         ;;
     *)
         echo "未知操作系统: $OS_TYPE"
