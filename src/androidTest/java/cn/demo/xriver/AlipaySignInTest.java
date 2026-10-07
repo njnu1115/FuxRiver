@@ -53,7 +53,7 @@ public class AlipaySignInTest {
     private static final long RUN_BUDGET_MS = 60 * 60 * 1000L;   // 唯一退出条件
     private static final long HOLDOVER_DWELL_MS           = 18000;    // HOLDOVER 等待
     private static final long PRESSBACK_HOLD_MS = 1000;   // PRESSBACK 停留 10s
-    private static final Pattern TASK_FILTER = Pattern.compile("\\+3积分|\\+5积分|5分钟|3集|玩一玩|换一换");
+    private static final Pattern TASK_FILTER = Pattern.compile("\\+1积分|\\+2积分|\\+3积分|\\+5积分|5分钟|玩一玩|换一换");
 
     /* ================= 状态判定字符串 ================= */
     private static final Pattern ANY_CN_TEXT = Pattern.compile(".*[\\\\u4e00-\\\\u9fa5].*");
