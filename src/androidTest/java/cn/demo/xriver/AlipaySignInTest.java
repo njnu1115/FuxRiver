@@ -47,7 +47,7 @@ public class AlipaySignInTest {
             "alipays://platformapi/startapp?appId=68687805&url=https%3A%2F%2Frender.alipay.com%2Fp%2Fyuyan%2F180020380000000023%2Fpoint-sign-in.html";
     private static final long WAIT_TIMEOUT = 1000;
     private static final String DEVICE_NAME = android.os.Build.DEVICE;
-    private static final int GO_FINISH_Y = DEVICE_NAME.equals("umi") ? 1560 : 2100;
+    private static final int GO_FINISH_Y = DEVICE_NAME.equals("umi") ? 1492 : 2100;
 
     /* ================= 状态机参数 ================= */
     private static final long RUN_BUDGET_MS = 60 * 60 * 1000L;   // 唯一退出条件
@@ -61,7 +61,7 @@ public class AlipaySignInTest {
             "已完成", "连签", "已领取", "兑好物", "今天","明天", "后天", "赚更多积分", "出行省更多", "+300积分", "+666积分", "+888积分", 
             "恭喜完成今日", "福利任务", "继续做任务赚积分吧" ,"滑动浏览以下内容15秒" , "换一换"};
     private static final String[] HOME_MARKERS = {
-            "扫一扫", "收付款", "卡包", "出行", "我的", "支付宝", "微信", "设置"};
+            "扫一扫", "收付款", "卡包", "出行", "我的", "支付宝", "微信", "设置","即将访问其他App","该网页可能存在引导跳转至其他app、下载其他app等行为，如果要继续访问，请点击复制链接后使用其他浏览器访问。", "去浏览器打开"};
 	private static final Pattern HOLDOVER_PATTERN_STAY = Pattern.compile("看一看5分钟得奖励|可得10积分|得15积分|可得25积分");
 	private static final Pattern HOLDOVER_PATTERN_SCROLL = Pattern.compile("剩余 [1-9]\\d* 秒");
 
@@ -154,7 +154,7 @@ public class AlipaySignInTest {
 
         Thread.sleep(1812);
         if (pick.contains("+5积分")){scrollFlag = true;}
-		if (pick.contains("换一换")){device.swipe(498, 555, 502, 666, 20);} // 点了换一换之后要往下滑动一点点否则下一轮dump不出来东西,但不需要点“去完成”
+		if (pick.contains("换一换")){device.swipe(498, 555, 502, 888, 20);} // 点了换一换之后要往下滑动一点点否则下一轮dump不出来东西,但不需要点“去完成”
 		else{device.click(561, GO_FINISH_Y);}        // "去完成"
         state = State.HOLDOVER;
     }
@@ -179,7 +179,6 @@ public class AlipaySignInTest {
 
     /** PRESSBACK：hold 10s → pressBack → counter++ → DETERMIN */
 	private void doPressBack() throws Exception {
-		Thread.sleep(PRESSBACK_HOLD_MS);
 		device.pressBack();
 
 		if("com.eg.android.AlipayGphone".equals(device.getCurrentPackageName())){state = State.DETERMIN;}

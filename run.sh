@@ -156,8 +156,3 @@ if [ -n "$LOGCAT_PID" ]; then
     echo ""
     echo ">>> 测试运行结束，已关闭后台 logcat。"
 fi
-
-# 收尾清理
-PKG_LIST="com.eg.android.AlipayGphone com.taobao.taobao com.baidu.searchbox \
-com.baidu.searchbox.lite com.taobao.etao com.sankuai.meituan com.kuaishou.nebula"
-for p in $PKG_LIST; do adb shell am force-stop "$p"; done
