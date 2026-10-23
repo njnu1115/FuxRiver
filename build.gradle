@@ -2,6 +2,16 @@ plugins {
     id 'com.android.library' version '8.3.2'
 }
 
+def ksPwd = ""
+def keyPwd = ""
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localProperties.load(localPropertiesFile.newDataInputStream())
+    ksPwd = localProperties.getProperty('sharedKeystorePassword')
+    keyPwd = localProperties.getProperty('sharedKeyPassword')
+}
+
 android {
     namespace 'cn.demo.xriver'
     compileSdk 34
@@ -12,10 +22,22 @@ android {
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        sharedDebug {
+            storeFile file("shared_debug.keystore") 
+            storePassword ksPwd
+            keyAlias "shared_debug_key"
+            keyPassword keyPwd
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            signingConfig signingConfigs.sharedDebug
         }
     }
 
