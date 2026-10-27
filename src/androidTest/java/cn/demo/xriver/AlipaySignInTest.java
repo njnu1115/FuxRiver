@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.regex.Pattern;
+import java.util.concurrent.*;
 
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
 
@@ -50,10 +51,11 @@ public class AlipaySignInTest {
     private static final int GO_FINISH_Y = DEVICE_NAME.equals("umi") ? 1492 : 2100;
 
     /* ================= 状态机参数 ================= */
-    private static final long RUN_BUDGET_MS = 60 * 60 * 1000L;   // 唯一退出条件
+    private static final long RUN_BUDGET_MS = 30 * 60 * 1000L;   // 唯一退出条件
     private static final long HOLDOVER_DWELL_MS           = 18000;    // HOLDOVER 等待
     private static final long PRESSBACK_HOLD_MS = 1000;   // PRESSBACK 停留 10s
-    private static final Pattern TASK_FILTER = Pattern.compile("\\+1积分|\\+2积分|\\+3积分|\\+5积分|5分钟|玩一玩|换一换");
+//    private static final Pattern TASK_FILTER = Pattern.compile("\\+1积分|\\+2积分|\\+3积分|\\+5积分|5分钟|玩一玩|换一换");
+    private static final Pattern TASK_FILTER = Pattern.compile("5分钟|玩一玩|换一换");
 
     /* ================= 状态判定字符串 ================= */
     private static final Pattern ANY_CN_TEXT = Pattern.compile(".*[\\\\u4e00-\\\\u9fa5].*");
@@ -105,7 +107,28 @@ public class AlipaySignInTest {
     private void determine() throws Exception {
         Thread.sleep(1000);
 		if(!"com.eg.android.AlipayGphone".equals(device.getCurrentPackageName())){state = State.HOME; return;}
-        lastDump = device.findObjects(By.clazz("android.widget.TextView"));   // 全流程唯一一次整页 dump
+
+		ExecutorService executor = Executors.newSingleThreadExecutor();
+		Future<List<UiObject2>> future = executor.submit(() -> {
+			return device.findObjects(By.clazz("android.widget.TextView"));
+		});
+		try {
+			// 设定最大等待时间，例如 3 秒。超过此时间直接抛出 TimeoutException
+			lastDump = (List<UiObject2>) future.get(3, TimeUnit.SECONDS);
+		} catch (TimeoutException e) {
+			// 降级策略：超时说明页面太复杂卡住了，直接采取保守策略
+			System.err.println("findObjects 超时，执行降级策略");
+			future.cancel(true); // 尝试中断任务
+			state = State.PRESSBACK; // 或者 State.HOME，取决于你的业务容错度
+			return;
+		} catch (Exception e) {
+			System.err.println("findObjects 执行异常: " + e.getMessage());
+			state = State.PRESSBACK;
+			return;
+		} finally {
+			executor.shutdownNow(); // 确保线程被清理
+		}
+
         // lastDump = device.findObjects(By.text(ANY_CN_TEXT));
         String screen = String.join("", extractAndLogTexts(lastDump));
 
